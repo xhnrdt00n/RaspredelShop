@@ -13,6 +13,8 @@ services:
       - pg_db
     depends_on:
       - pg_db
+      - consumer
+      - rabbitmq
 
   pg_db:
     container_name: pg_db
@@ -31,5 +33,37 @@ services:
     build: ./StoreServer
     ports:
       - "8080:8080"
+    env_file:
+      - /.env
     environment:
-      - SERVER_PORT=8080
+      - SERVER_MODE=dev
+      - HOST=0.0.0.0
+      - PORT=8080
+
+  rabbitmq:
+    image: rabbitmq:3.9-management-alpine
+    container_name: 'rabbitmq'
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:15672" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+
+  consumer:
+    container_name: 'consumer'
+    build: ./consumer
+    env_file:
+      - /.env
+    environment:
+      - QUEUE_HOST=rabbitmq
+      - QUEUE_PORT=5672
+      - QUEUE_USER=guest
+      - QUEUE_PASS=guest
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped

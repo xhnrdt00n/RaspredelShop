@@ -1,5 +1,8 @@
+import json
 import os
+from io import StringIO
 
+import jsonpickle
 from flask import Flask, redirect, url_for, flash, request
 from flask_admin.babel import gettext
 from flask_admin.contrib.sqla import ModelView
@@ -9,17 +12,23 @@ from flask_sqlalchemy import SQLAlchemy
 
 from flask_admin import Admin, expose
 
+import pika
+
 app = Flask(__name__)
 app.debug = True
 
 app.config['FLASK_ENV'] = os.getenv("FLASK_ENV")
 # Scheme: "postgres+psycopg2://<USERNAME>:<PASSWORD>@<IP_ADDRESS>:<PORT>/<DATABASE_NAME>"
-app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@pg_db:5432/{os.getenv("POSTGRES_DB")}'
-#app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://flask:flask@localhost:5432/flask'
+app.config[
+    'SQLALCHEMY_DATABASE_URI'] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@pg_db:5432/{os.getenv("POSTGRES_DB")}'
+# app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://flask:flask@localhost:5432/flask'
 app.config['SECRET_KEY'] = 'anykey'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 
 db = SQLAlchemy(app)
+
+connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+channel = connection.channel()
 
 
 class Category(db.Model):
@@ -32,16 +41,23 @@ class Category(db.Model):
     parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), index=True)
     parent = db.relationship(lambda: Category, remote_side=id, backref='sub_category')
 
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.toDict(),
+                          sort_keys=True, indent=4)
+
     def __repr__(self):
         return self.name
+
+    def toDict(self):
+        return {'id': self.id, 'name': self.name, 'parent': self.parent_id}
 
 
 class CategoryView(ModelView):
     column_list = (
-        'name','parent',
+        'name', 'parent',
     )
     form_columns = (
-        'name','parent',
+        'name', 'parent',
     )
 
     @expose('/new/', methods=('GET', 'POST'))
@@ -62,9 +78,19 @@ class CategoryView(ModelView):
             # in versions 1.1.0 and before, this returns a boolean
             # in later versions, this is the model itself
             model = self.create_model(form)
+
             if model:
-                #TODO ivent to rabbitMQ
-                #model.id model.name changed
+                # TODO ivent to rabbitMQ
+                channel.exchange_declare(exchange='Shopper',
+                                         exchange_type='direct',auto_delete=True)
+                io = r'["id":{model.id},"Name":{model.name}]'
+                app.logger.info(jsonpickle.dumps(model.toDict()))
+                channel.basic_publish(exchange='Shopper',
+                                      routing_key='addCategory',
+                                      body=jsonpickle.dumps(model.toDict()))
+
+
+                # model.id model.name changed
                 flash(gettext('Record was successfully created.'), 'success')
                 if '_add_another' in request.form:
                     return redirect(request.url)
@@ -77,7 +103,6 @@ class CategoryView(ModelView):
                     return redirect(url)
                 else:
                     # save button
-                    app.logger.info(model)
 
                     return redirect(self.get_save_return_url(model, is_created=True))
 
@@ -105,7 +130,7 @@ class ItemView(ModelView):
     )
 
     column_sortable_list = (
-        'name', ("name","price"), "image_url",
+        'name', ("name", "price"), "image_url",
     )
 
 
