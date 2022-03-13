@@ -1,0 +1,35 @@
+version: "3.9"  # optional since v1.27.0
+services:
+  flask_admin:
+    build: ./flaskAdmin
+    environment:
+      - POSTGRES_PASSWORD=flask
+      - POSTGRES_USER=flask
+      - POSTGRES_DB=flask
+      - FLASK_ENV=development
+    ports:
+      - "5000:5000"
+    links:
+      - pg_db
+    depends_on:
+      - pg_db
+
+  pg_db:
+    container_name: pg_db
+    image: postgres:12
+    environment:
+      - POSTGRES_PASSWORD=flask
+      - POSTGRES_USER=flask
+      - POSTGRES_DB=flask
+    volumes:
+       - ./storage/postgresql/data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  store_server:
+    build: ./StoreServer
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
