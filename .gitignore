@@ -1,0 +1,5 @@
+/backend
+/fake_server
+/storage
+.env
+.idea
