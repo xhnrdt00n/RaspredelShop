@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"backend/internal/config"
-	"backend/internal/service"
+	"StoreServer/internal/config"
+	"StoreServer/internal/service"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"net/http"
@@ -35,12 +35,24 @@ func (h *Handler) Init(cfg *config.Config) *echo.Echo {
 		return c.String(http.StatusOK, "pong")
 	})
 	router.GET("/categories", h.Categories)
+	router.GET("/categories/:id", h.ProductsByCategories)
 
 	return router
 }
 
 func (h *Handler) Categories(c echo.Context) error {
 	resp, err := h.Services.DB.GetAllCategories()
+	if err != nil {
+		return c.JSON(500, err.Error())
+	}
+
+	return c.JSON(200, resp)
+}
+
+func (h *Handler) ProductsByCategories(c echo.Context) error {
+	id := c.Param("id")
+
+	resp, err := h.Services.DB.GetProductsById(id)
 	if err != nil {
 		return c.JSON(500, err.Error())
 	}

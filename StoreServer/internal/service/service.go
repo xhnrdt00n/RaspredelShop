@@ -1,8 +1,8 @@
 package service
 
 import (
-	"backend/internal/config"
-	"backend/internal/service/db"
+	"StoreServer/internal/config"
+	"StoreServer/internal/service/db"
 	"context"
 	"github.com/labstack/gommon/log"
 )

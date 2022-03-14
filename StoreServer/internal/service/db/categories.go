@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
+	"strconv"
 	"time"
 )
 
@@ -26,8 +27,30 @@ type Response struct {
 func (m *MongoCon) GetAllCategories() ([]bson.M, error) {
 	ctx, cancel := context.WithTimeout(m.mongoConnCtx, time.Second*10)
 	defer cancel()
-	coll := m.mongoConn.Database("ShopRaspredel").Collection("Shoper")
+	coll := m.mongoConn.Database("ShopRaspredel").Collection("Categories")
 	cursor, err := coll.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+
+	var responseMongo []bson.M
+	err = cursor.All(ctx, &responseMongo)
+	if err != nil {
+		return nil, err
+	}
+
+	return responseMongo, nil
+}
+
+func (m *MongoCon) GetProductsById(id string) ([]bson.M, error) {
+	ctx, cancel := context.WithTimeout(m.mongoConnCtx, time.Second*10)
+	defer cancel()
+	coll := m.mongoConn.Database("ShopRaspredel").Collection("Products")
+	if id == "other" {
+
+	}
+	idx, _ := strconv.Atoi(id)
+	cursor, err := coll.Find(ctx, bson.D{{"Category", idx}})
 	if err != nil {
 		return nil, err
 	}

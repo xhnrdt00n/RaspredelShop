@@ -6,4 +6,5 @@ type DBService interface {
 	Close() error
 
 	GetAllCategories() ([]bson.M, error)
+	GetProductsById(string) ([]bson.M, error)
 }

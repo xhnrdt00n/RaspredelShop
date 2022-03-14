@@ -1,4 +1,4 @@
-module backend
+module StoreServer
 
 go 1.17
 

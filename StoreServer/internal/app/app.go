@@ -1,9 +1,9 @@
 package app
 
 import (
-	"backend/internal/config"
-	"backend/internal/routes"
-	"backend/internal/service"
+	"StoreServer/internal/config"
+	"StoreServer/internal/routes"
+	"StoreServer/internal/service"
 	"context"
 	"fmt"
 	"github.com/labstack/echo/v4"

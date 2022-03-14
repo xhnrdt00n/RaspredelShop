@@ -2,4 +2,5 @@
 /fake_server
 /storage
 .env
+/flaskAdmin/.env
 .idea

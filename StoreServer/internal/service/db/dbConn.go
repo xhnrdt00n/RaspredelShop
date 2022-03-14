@@ -1,7 +1,7 @@
 package db
 
 import (
-	"backend/internal/config"
+	"StoreServer/internal/config"
 	"context"
 	"fmt"
 	"go.mongodb.org/mongo-driver/mongo"
