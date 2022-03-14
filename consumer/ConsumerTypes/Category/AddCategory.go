@@ -55,7 +55,7 @@ func ListenAddCategory(ch *amqp.Channel, service db.DBService) {
 				continue
 			}
 
-			if err := service.AddCategories(category); err != nil {
+			if err := service.AddCategory(category); err != nil {
 				log.Println(err)
 				continue
 			}

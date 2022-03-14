@@ -4,10 +4,11 @@ from io import StringIO
 
 import jsonpickle
 from flask import Flask, redirect, url_for, flash, request
-from flask_admin.babel import gettext
+from flask_admin.babel import gettext, ngettext
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.form import FormOpts
-from flask_admin.helpers import get_redirect_target
+from flask_admin.helpers import get_redirect_target, flash_errors
+from flask_admin.model.helpers import get_mdict_item_or_list
 from flask_sqlalchemy import SQLAlchemy
 
 from flask_admin import Admin, expose
@@ -19,15 +20,15 @@ app.debug = True
 
 app.config['FLASK_ENV'] = os.getenv("FLASK_ENV")
 # Scheme: "postgres+psycopg2://<USERNAME>:<PASSWORD>@<IP_ADDRESS>:<PORT>/<DATABASE_NAME>"
-app.config[
-    'SQLALCHEMY_DATABASE_URI'] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@pg_db:5432/{os.getenv("POSTGRES_DB")}'
-# app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://flask:flask@localhost:5432/flask'
+# app.config[
+#     'SQLALCHEMY_DATABASE_URI'] = f'postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@pg_db:5432/{os.getenv("POSTGRES_DB")}'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://flask:flask@localhost:5432/flask'
 app.config['SECRET_KEY'] = 'anykey'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 
 db = SQLAlchemy(app)
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 channel = connection.channel()
 
 
@@ -50,6 +51,10 @@ class Category(db.Model):
 
     def toDict(self):
         return {'id': self.id, 'name': self.name, 'parent': self.parent_id}
+
+
+def ToDict(id, name, parent_id):
+    return {'id': id, 'name': name, 'parent': parent_id}
 
 
 class CategoryView(ModelView):
@@ -80,15 +85,14 @@ class CategoryView(ModelView):
             model = self.create_model(form)
 
             if model:
-                # TODO ivent to rabbitMQ
+                # RabbitMQ
                 channel.exchange_declare(exchange='Shopper',
-                                         exchange_type='direct',auto_delete=True)
+                                         exchange_type='direct', auto_delete=True)
                 io = r'["id":{model.id},"Name":{model.name}]'
                 app.logger.info(jsonpickle.dumps(model.toDict()))
                 channel.basic_publish(exchange='Shopper',
                                       routing_key='addCategory',
                                       body=jsonpickle.dumps(model.toDict()))
-
 
                 # model.id model.name changed
                 flash(gettext('Record was successfully created.'), 'success')
@@ -118,6 +122,111 @@ class CategoryView(ModelView):
                            form=form,
                            form_opts=form_opts,
                            return_url=return_url)
+
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('Record does not exist.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+
+                # RabbitMQ
+                channel.exchange_declare(exchange='Shopper',
+                                         exchange_type='direct', auto_delete=True)
+                io = r'["id":{model.id},"Name":{model.name}]'
+                channel.basic_publish(exchange='Shopper',
+                                      routing_key='changeCategory',
+                                      body=jsonpickle.dumps(ToDict(model.id, form.data["name"], form.data["parent"])))
+
+                flash(gettext('Record was successfully saved.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('Record does not exist.'), 'error')
+                return redirect(return_url)
+
+            # RabbitMQ
+            channel.exchange_declare(exchange='Shopper',
+                                     exchange_type='direct', auto_delete=True)
+            io = r'["id":{model.id},"Name":{model.name}]'
+            app.logger.info(jsonpickle.dumps(model.toDict()))
+            channel.basic_publish(exchange='Shopper',
+                                  routing_key='deleteCategory',
+                                  body=jsonpickle.dumps(model.toDict()))
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Record was successfully deleted.',
+                             '%(count)s records were successfully deleted.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Failed to delete record. %(error)s')
+
+        return redirect(return_url)
 
 
 class ItemView(ModelView):

@@ -30,15 +30,6 @@ func (h *Handler) Init(cfg *config.Config) *echo.Echo {
 	// Init log level
 	router.Debug = cfg.ServerMode != config.Dev
 
-	//docs.SwaggerInfo.Host = fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
-	//if cfg.ServerMode != config.Dev {
-	//	docs.SwaggerInfo.Host = cfg.Host
-	//}
-	//
-	//if cfg.ServerMode != config.Prod {
-	//	router.GET("/swagger/*", echoSwagger.WrapHandler)
-	//}
-
 	// Init router
 	router.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "pong")
