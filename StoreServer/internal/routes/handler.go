@@ -5,6 +5,8 @@ import (
 	"StoreServer/internal/service"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"html/template"
+	"io"
 	"net/http"
 )
 
@@ -17,9 +19,22 @@ func NewHandler(service *service.Service, cfg *config.Config) *Handler {
 	return &Handler{service, cfg}
 }
 
+type TemplateRenderer struct {
+	templates *template.Template
+}
+
+func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	return t.templates.ExecuteTemplate(w, name, data)
+}
+
 func (h *Handler) Init(cfg *config.Config) *echo.Echo {
 	// Init echo handler
 	router := echo.New()
+
+	renderer := &TemplateRenderer{
+		templates: template.Must(template.ParseGlob("./internal/views/*.html")),
+	}
+	router.Renderer = renderer
 	// Init middleware
 	router.Use(
 		middleware.LoggerWithConfig(middleware.LoggerConfig{
@@ -46,7 +61,8 @@ func (h *Handler) Categories(c echo.Context) error {
 		return c.JSON(500, err.Error())
 	}
 
-	return c.JSON(200, resp)
+	return c.Render(http.StatusOK, "index.html", resp)
+	//return c.JSON(200, resp)
 }
 
 func (h *Handler) ProductsByCategories(c echo.Context) error {
@@ -57,5 +73,6 @@ func (h *Handler) ProductsByCategories(c echo.Context) error {
 		return c.JSON(500, err.Error())
 	}
 
-	return c.JSON(200, resp)
+	return c.Render(http.StatusOK, "product.html", resp)
+	//return c.JSON(200, resp)
 }

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Каталог</title>
+</head>
+<body>
+<h1>Категории</h1>
+<ul>
+    {{range .}}
+    <li><b><a href="http://localhost:8080/categories/{{ .id }}">{{.Name}}</a></b></li>
+
+    {{end}}
+</ul>
+</body>
+</html>
