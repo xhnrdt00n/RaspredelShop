@@ -35,6 +35,9 @@ func (h *Handler) Init(cfg *config.Config) *echo.Echo {
 		templates: template.Must(template.ParseGlob("./internal/views/*.html")),
 	}
 	router.Renderer = renderer
+
+	router.Static("static", "./internal/views")
+
 	// Init middleware
 	router.Use(
 		middleware.LoggerWithConfig(middleware.LoggerConfig{
@@ -51,6 +54,7 @@ func (h *Handler) Init(cfg *config.Config) *echo.Echo {
 	})
 	router.GET("/categories", h.Categories)
 	router.GET("/categories/:id", h.ProductsByCategories)
+	router.GET("/jsonCategories", h.JsonCategories)
 
 	return router
 }
@@ -65,6 +69,15 @@ func (h *Handler) Categories(c echo.Context) error {
 	//return c.JSON(200, resp)
 }
 
+func (h *Handler) JsonCategories(c echo.Context) error {
+	resp, err := h.Services.DB.GetAllCategories()
+	if err != nil {
+		return c.JSON(500, err.Error())
+	}
+
+	return c.JSON(200, resp)
+}
+
 func (h *Handler) ProductsByCategories(c echo.Context) error {
 	id := c.Param("id")
 
@@ -73,6 +86,6 @@ func (h *Handler) ProductsByCategories(c echo.Context) error {
 		return c.JSON(500, err.Error())
 	}
 
-	return c.Render(http.StatusOK, "product.html", resp)
-	//return c.JSON(200, resp)
+	//return c.Render(http.StatusOK, "product.html", resp)
+	return c.JSON(200, resp)
 }
