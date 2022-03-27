@@ -15,6 +15,7 @@ services:
       - pg_db
       - consumer
       - rabbitmq
+    restart: on-failure
 
   pg_db:
     container_name: pg_db
