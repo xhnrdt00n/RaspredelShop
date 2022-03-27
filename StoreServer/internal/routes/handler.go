@@ -3,6 +3,7 @@ package routes
 import (
 	"StoreServer/internal/config"
 	"StoreServer/internal/service"
+	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"html/template"
@@ -52,34 +53,16 @@ func (h *Handler) Init(cfg *config.Config) *echo.Echo {
 	router.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "pong")
 	})
-	router.GET("/categories", h.Categories)
 	router.GET("/categories/:id", h.ProductsByCategories)
-	router.GET("/jsonCategories", h.JsonCategories)
 
 	return router
 }
 
-func (h *Handler) Categories(c echo.Context) error {
-	resp, err := h.Services.DB.GetAllCategories()
-	if err != nil {
-		return c.JSON(500, err.Error())
-	}
-
-	return c.Render(http.StatusOK, "index.html", resp)
-	//return c.JSON(200, resp)
-}
-
-func (h *Handler) JsonCategories(c echo.Context) error {
-	resp, err := h.Services.DB.GetAllCategories()
-	if err != nil {
-		return c.JSON(500, err.Error())
-	}
-
-	return c.JSON(200, resp)
-}
-
 func (h *Handler) ProductsByCategories(c echo.Context) error {
 	id := c.Param("id")
+	if id == "" {
+		fmt.Println("id == '/ ")
+	}
 
 	resp, err := h.Services.DB.GetProductsById(id)
 	if err != nil {

@@ -45,12 +45,12 @@ func (m *MongoCon) GetAllCategories() ([]bson.M, error) {
 func (m *MongoCon) GetProductsById(id string) ([]bson.M, error) {
 	ctx, cancel := context.WithTimeout(m.mongoConnCtx, time.Second*10)
 	defer cancel()
-	coll := m.mongoConn.Database("ShopRaspredel").Collection("Products")
+	coll := m.mongoConn.Database("ShopRaspredel").Collection("Categories")
 	if id == "other" {
 
 	}
 	idx, _ := strconv.Atoi(id)
-	cursor, err := coll.Find(ctx, bson.D{{"Category", idx}})
+	cursor, err := coll.Find(ctx, bson.D{{"id", idx}})
 	if err != nil {
 		return nil, err
 	}
