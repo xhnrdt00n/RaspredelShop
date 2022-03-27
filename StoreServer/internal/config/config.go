@@ -7,10 +7,11 @@ import (
 )
 
 const (
-	defaultHTTPPort = "8080"
-	defaultHost     = ""
-	Prod            = "prod"
-	Dev             = "dev"
+	defaultHTTPPort  = "8080"
+	defaultHost      = ""
+	Prod             = "prod"
+	Dev              = "dev"
+	defaultSecretKey = "secretkey"
 )
 
 type Config struct {
@@ -18,6 +19,7 @@ type Config struct {
 	Port       string
 	ServerMode string
 	DbAddress  string
+	Secretkey  []byte
 }
 
 type AuthType struct {
@@ -62,7 +64,12 @@ func Init() *Config {
 		log.Fatal("db host not set up in env")
 	}
 
+	var SecretKey string
+	if SecretKey, ok = os.LookupEnv("SECRET_KEY"); !ok {
+		SecretKey = (defaultSecretKey)
+	}
+
 	mongoAddr := fmt.Sprintf("mongodb+srv://%s:%s@%s/myFirstDatabase?retryWrites=true&w=majority", DbUser, DbPassword, DbHost)
 
-	return &Config{host, port, serverMode, mongoAddr}
+	return &Config{host, port, serverMode, mongoAddr, []byte(SecretKey)}
 }

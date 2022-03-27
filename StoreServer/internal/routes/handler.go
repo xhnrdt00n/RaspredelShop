@@ -3,7 +3,7 @@ package routes
 import (
 	"StoreServer/internal/config"
 	"StoreServer/internal/service"
-	"fmt"
+	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"html/template"
@@ -15,6 +15,8 @@ type Handler struct {
 	Services *service.Service
 	cfg      *config.Config
 }
+
+const startCategory = "65"
 
 func NewHandler(service *service.Service, cfg *config.Config) *Handler {
 	return &Handler{service, cfg}
@@ -48,27 +50,73 @@ func (h *Handler) Init(cfg *config.Config) *echo.Echo {
 
 	// Init log level
 	router.Debug = cfg.ServerMode != config.Dev
-
+	router.Use(Middleware(cfg))
 	// Init router
 	router.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "pong")
 	})
 	router.GET("/categories/:id", h.ProductsByCategories)
+	router.GET("/categories/", h.GetStartCategories)
 
 	return router
 }
 
 func (h *Handler) ProductsByCategories(c echo.Context) error {
 	id := c.Param("id")
-	if id == "" {
-		fmt.Println("id == '/ ")
-	}
-
 	resp, err := h.Services.DB.GetProductsById(id)
 	if err != nil {
 		return c.JSON(500, err.Error())
 	}
 
-	//return c.Render(http.StatusOK, "product.html", resp)
 	return c.JSON(200, resp)
+}
+
+func (h *Handler) GetStartCategories(c echo.Context) error {
+	resp, err := h.Services.DB.GetProductsById(startCategory)
+	if err != nil {
+		return c.JSON(500, err.Error())
+	}
+
+	return c.JSON(200, resp)
+}
+
+type AuthClaims struct {
+	Id     string `json:"id"`
+	Login  string `json:"login"`
+	RoleID int    `json:"role_id"`
+	jwt.StandardClaims
+}
+
+func Middleware(cfg *config.Config) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			header := c.Request().Header.Get("Authorization")
+			if header == "" {
+				return c.JSON(401, "Unauthorized")
+			}
+
+			token, err := jwt.ParseWithClaims(
+				header,
+				&AuthClaims{},
+				func(token *jwt.Token) (interface{}, error) {
+					return cfg.Secretkey, nil
+				},
+			)
+
+			if err != nil {
+				return c.JSON(401, "Unauthorized")
+			}
+
+			claims, ok := token.Claims.(*AuthClaims)
+			if !ok {
+				return c.JSON(401, "Unauthorized")
+			}
+
+			if claims.Login != "" && claims.Id != "" && claims.RoleID != 0 {
+				return next(c)
+			}
+
+			return c.JSON(401, "Unauthorized")
+		}
+	}
 }

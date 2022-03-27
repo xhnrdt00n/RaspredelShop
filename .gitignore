@@ -1,6 +1,7 @@
 
 /fake_server
 /storage
+/user_storage
 .env
 /flaskAdmin/.env
 .idea

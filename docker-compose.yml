@@ -2,6 +2,8 @@ version: "3.9"  # optional since v1.27.0
 services:
   flask_admin:
     build: ./flaskAdmin
+    env_file:
+      - /.env
     environment:
       - POSTGRES_PASSWORD=flask
       - POSTGRES_USER=flask
@@ -28,6 +30,20 @@ services:
        - ./storage/postgresql/data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    restart: unless-stopped
+
+
+  user_db:
+    container_name: user_db
+    image: postgres:12
+    environment:
+      - POSTGRES_PASSWORD=user
+      - POSTGRES_USER=user
+      - POSTGRES_DB=user
+    volumes:
+      - ./user_storage/postgresql/data:/var/lib/postgresql/data
+    ports:
+      - "5431:5432"
     restart: unless-stopped
 
   store_server:
@@ -67,4 +83,26 @@ services:
       - QUEUE_PASS=guest
     depends_on:
       - rabbitmq
+    restart: unless-stopped
+
+
+  api_gateway:
+    container_name: 'api_gateway'
+    build: ./Gateway
+    env_file:
+      - /.env
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_MODE=dev
+      - HOST=0.0.0.0
+      - PORT=8081
+    links:
+      - user_db
+      - flask_admin
+      - store_server
+    depends_on:
+      - flask_admin
+      - store_server
+      - user_db
     restart: unless-stopped
